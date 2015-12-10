@@ -103,6 +103,28 @@ class NginxConfiguratorTest(util.NginxTest):
     def test_more_info(self):
         self.assertTrue('nginx.conf' in self.config.more_info())
 
+    def test_deploy_forward_secrecy(self):
+        # Choose a version of Nginx greater than 1.1.0 to invoke
+        # perfect forward secrecy settings.
+        self.config.version = (1, 9, 6)
+        example_conf = self.config.parser.abs_path('sites-enabled/example.com')
+        self.config.deploy_cert(
+            "www.example.com",
+            "example/cert.pem",
+            "example/key.pem",
+            "example/chain.pem",
+            "example/fullchain.pem")
+        self.config.save()
+        self.config.parser.load()
+        generated_conf = self.config.parser.parsed[example_conf]
+
+        self.assertTrue(util.contains_at_depth(generated_conf,
+                                               ['ssl_protocols', 'TLSv1.2 TLSv1.1 TLSv1'], 2))
+        self.assertTrue(util.contains_at_depth(generated_conf,
+                                               ['ssl_ciphers', 'ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:DHE-DSS-AES128-GCM-SHA256:kEDH+AESGCM:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA:ECDHE-ECDSA-AES256-SHA:DHE-RSA-AES128-SHA256:DHE-RSA-AES128-SHA:DHE-DSS-AES128-SHA256:DHE-RSA-AES256-SHA256:DHE-DSS-AES256-SHA:DHE-RSA-AES256-SHA:ECDHE-RSA-DES-CBC3-SHA:ECDHE-ECDSA-DES-CBC3-SHA:AES128-GCM-SHA256:AES256-GCM-SHA384:AES128-SHA256:AES256-SHA256:AES128-SHA:AES256-SHA:AES:CAMELLIA:DES-CBC3-SHA:!aNULL:!eNULL:!EXPORT:!DES:!RC4:!MD5:!PSK:!aECDH:!EDH-DSS-DES-CBC3-SHA:!EDH-RSA-DES-CBC3-SHA:!KRB5-DES-CBC3-SHA'], 2))
+        self.assertTrue(util.contains_at_depth(generated_conf,
+                                               ['ssl_prefer_server_ciphers', 'on'], 2))
+
     def test_deploy_cert_stapling(self):
         # Choose a version of Nginx greater than 1.3.7 so stapling code gets
         # invoked.
